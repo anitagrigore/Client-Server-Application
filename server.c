@@ -59,9 +59,9 @@ int main(int argc, char** argv)
           if (i == sockfd_udp) {
             handle_udp_message(&ctx, sockfd_udp);
           } else if (i == sockfd_tcp) {
-            handle_client(&ctx, sockfd_tcp);
+            handle_tcp_client(&ctx, sockfd_tcp);
 
-            struct client_tcp* client_addr = ctx->pending->tail;
+            struct client_tcp* client_addr = ctx.pending->tail->data;
             FD_SET(client_addr->sockfd, &read_fds);
 
           } else {

@@ -39,10 +39,10 @@ int server_tcp(uint16_t port_nr)
 
 int handle_tcp_client(struct context* ctx, int sockfd_tcp)
 {
-  struct client_tcp *client = malloc(sizeof(struct client_tcp));
+  struct client_tcp *client = malloc(sizeof(struct client_tcp*));
   client->addrlen = sizeof(struct sockaddr_storage);
 
-  int sockfd_cli = accept(sockfd_tcp, sizeof(sockfd_tcp), &client->addr, &client->addrlen);
+  int sockfd_cli = accept(sockfd_tcp, (struct sockaddr*) &client->addr, &client->addrlen);
   if (sockfd_cli < 0) {
     // eroare
     return -1;
@@ -54,13 +54,12 @@ int handle_tcp_client(struct context* ctx, int sockfd_tcp)
   return 0;
 }
 
-
 int handle_hello_message(struct context* ctx, int sockfd, char *id)
 {
   struct client_tcp* client = NULL;
   struct list_node* curr;
   for (curr = ctx->pending->head; curr != NULL; curr = curr->next) {
-    struct client_tcp* c = curr->value;
+    struct client_tcp* c = curr->data;
     if (c->sockfd == sockfd) {
       client = c;
       break;
@@ -72,7 +71,7 @@ int handle_hello_message(struct context* ctx, int sockfd, char *id)
   }
 
   for (curr = ctx->clients->head; curr != NULL; curr = curr->next) {
-    struct client_tcp* c = curr->value;
+    struct client_tcp* c = curr->data;
 
     if (strcmp(c->id, id) == 0) {
       if (c->sockfd == -1) {
@@ -91,5 +90,10 @@ int handle_hello_message(struct context* ctx, int sockfd, char *id)
     }
   }
 
+  return 0;
+}
+
+int handle_tcp_message(struct context* ctx, int sockfd)
+{
   return 0;
 }
