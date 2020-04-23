@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "server_tcp.h"
+
 #define BACKLOG 1024
 
 int server_tcp(uint16_t port_nr)
@@ -17,12 +19,12 @@ int server_tcp(uint16_t port_nr)
     return -1;
   }
 
-  struct sockaddr_in server;
-  server.sin_family = AF_INET;
-  server.sin_port = htons(port_nr);
-  server.sin_addr.s_addr = INADDR_ANY;
+  struct sockaddr_in server_addr;
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(port_nr);
+  server_addr.sin_addr.s_addr = INADDR_ANY;
 
-  if (bind(sockfd_tcp, (struct sockaddr *) &server, sizeof(struct sockaddr)) < 0) {
+  if (bind(sockfd_tcp, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
     perror("bind");
     return -1;
   }
@@ -32,11 +34,62 @@ int server_tcp(uint16_t port_nr)
     return -1;
   }
 
-  fd_set read_fds, tmp_fds;
-  int fdmax;
-  FD_ZERO(&read_fds);
-  FD_ZERO(&tmp_fds);
-  FD_SET(sockfd_tcp, &read_fds);
-  fdmax = sockfd_tcp;
+  return sockfd_tcp;
+}
 
+int handle_tcp_client(struct context* ctx, int sockfd_tcp)
+{
+  struct client_tcp *client = malloc(sizeof(struct client_tcp));
+  client->addrlen = sizeof(struct sockaddr_storage);
+
+  int sockfd_cli = accept(sockfd_tcp, sizeof(sockfd_tcp), &client->addr, &client->addrlen);
+  if (sockfd_cli < 0) {
+    // eroare
+    return -1;
+  }
+
+  client->sockfd = sockfd_cli;
+  list_insert(ctx->pending, client, NULL);
+
+  return 0;
+}
+
+
+int handle_hello_message(struct context* ctx, int sockfd, char *id)
+{
+  struct client_tcp* client = NULL;
+  struct list_node* curr;
+  for (curr = ctx->pending->head; curr != NULL; curr = curr->next) {
+    struct client_tcp* c = curr->value;
+    if (c->sockfd == sockfd) {
+      client = c;
+      break;
+    }
+  }
+
+  if (client == NULL) {
+    return -1;
+  }
+
+  for (curr = ctx->clients->head; curr != NULL; curr = curr->next) {
+    struct client_tcp* c = curr->value;
+
+    if (strcmp(c->id, id) == 0) {
+      if (c->sockfd == -1) {
+        c->sockfd = sockfd;
+        c->addr = client->addr;
+        c->addrlen = client->addrlen;
+
+        list_delete(ctx->pending, curr);
+      } else {
+        // eroare
+        return -1;
+      }
+    } else {
+      memcpy(client->id, id, sizeof(client->id));
+      list_insert(ctx->clients, client, ctx->clients->tail);
+    }
+  }
+
+  return 0;
 }

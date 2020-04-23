@@ -9,6 +9,16 @@
 #define MAX_ID_LEN 10
 #define MAX_TOPIC_LEN 50
 
+#define DIE(assertion, call_description)	\
+	do {									                  \
+		if (assertion) {					            \
+			fprintf(stderr, "(%s, %d): ",	      \
+					__FILE__, __LINE__);	          \
+			perror(call_description);		        \
+			exit(EXIT_FAILURE);				          \
+		}									                    \
+	} while(0)
+
 struct int_msg
 {
   uint8_t sign;
@@ -59,7 +69,8 @@ struct udp_message
 struct context
 {
   struct list* message_list;
-  uint32_t port;
+  struct list* clients;
+  struct list* pending;
 };
 
 typedef enum
@@ -69,3 +80,24 @@ typedef enum
   FLOAT,
   STRING,
 } udp_message_type;
+
+struct client_tcp
+{
+  char id[MAX_ID_LEN + 1];
+  struct sockaddr_storage addr;
+  socklen_t addrlen;
+  int sockfd;
+};
+
+typedef enum
+{
+  HELLO,
+  SUBSCRIBE,
+  UNSUBSCRIBE,
+} tcp_message_type;
+
+struct tcp_message_header
+{
+  uint8_t type;
+  uint16_t size;
+} __attribute__((packed));
