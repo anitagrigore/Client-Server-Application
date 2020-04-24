@@ -24,6 +24,7 @@ int main(int argc, char** argv)
   //    =>stdin -> handle_keyboard_input -> daca exit, break
 
     if (argc < 2) {
+
       return -1;
     }
 
@@ -64,8 +65,20 @@ int main(int argc, char** argv)
             struct client_tcp* client_addr = ctx.pending->tail->data;
             FD_SET(client_addr->sockfd, &read_fds);
 
+            if (client_addr->sockfd > fdmax) {
+              fdmax = client_addr->sockfd;
+            }
+
+          } else if (i == STDIN_FILENO) {
+
           } else {
-            handle_tcp_message(&ctx, i);
+            printf("Socket: %d\n", i);
+
+            if (handle_tcp_message(&ctx, i) <= 0)
+            {
+              close(i);
+              FD_CLR(i, &read_fds);
+            }
           }
         }
       }

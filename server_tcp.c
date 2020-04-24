@@ -67,6 +67,7 @@ int handle_hello_message(struct context* ctx, int sockfd, char *id)
   }
 
   if (client == NULL) {
+    printf("Unexpected hello message.\n");
     return -1;
   }
 
@@ -79,14 +80,19 @@ int handle_hello_message(struct context* ctx, int sockfd, char *id)
         c->addr = client->addr;
         c->addrlen = client->addrlen;
 
+        printf("Client %s reconnected.\n", id);
+
         list_delete(ctx->pending, curr);
       } else {
         // eroare
+        printf("Username is already in use.\n");
         return -1;
       }
     } else {
       memcpy(client->id, id, sizeof(client->id));
       list_insert(ctx->clients, client, ctx->clients->tail);
+
+      printf("Client %s connected.\n", id);
     }
   }
 
@@ -95,5 +101,37 @@ int handle_hello_message(struct context* ctx, int sockfd, char *id)
 
 int handle_tcp_message(struct context* ctx, int sockfd)
 {
-  return 0;
+  char buf[MAX_PAYLOAD_LEN] = {0};
+  int n_read = read(sockfd, buf, sizeof(buf));
+  if (n_read == -1) {
+    fprintf(stderr, "Read failed.");
+    return -1;
+  }
+
+  if (n_read == 0) {
+    // TODO disconnect client.
+    printf("Client disconnected.\n");
+    return 0;
+  }
+
+  for (int i = 0; i < n_read; i++)
+  {
+    printf("%02x ", buf[i] & 0xff);
+  }
+  printf("\n");
+
+  struct tcp_message_header* hdr = (struct tcp_message_header*) buf;
+  char* payload = buf + sizeof(struct tcp_message_header);
+
+  printf("header type = %d\n", hdr->type);
+  switch (hdr->type) {
+    case HELLO:
+    {
+      printf("Message type hello\n");
+      handle_hello_message(ctx, sockfd, payload);
+      break;
+    }
+  }
+
+  return n_read;
 }

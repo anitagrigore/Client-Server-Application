@@ -91,9 +91,9 @@ struct client_tcp
 
 typedef enum
 {
-  HELLO,
-  SUBSCRIBE,
-  UNSUBSCRIBE,
+  HELLO = 0,
+  SUBSCRIBE = 1,
+  UNSUBSCRIBE = 2,
 } tcp_message_type;
 
 struct tcp_message_header
