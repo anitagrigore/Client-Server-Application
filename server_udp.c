@@ -44,7 +44,7 @@ int handle_udp_message(struct context* ctx, int sockfd_udp)
     return -1;
   }
 
-  list_insert(ctx->message_list, &p, NULL);
+  list_insert(ctx->message_list, &p, ctx->message_list->tail);
 
   print_udp_message(&p);
 
