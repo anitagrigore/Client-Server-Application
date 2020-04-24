@@ -1,3 +1,7 @@
+#include "helper.h"
+#include "linkedlist.h"
+#include "server_udp.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -5,13 +9,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <netdb.h>
-
-#include "helper.h"
-#include "linkedlist.h"
-#include "server_udp.h"
 
 int server_udp(uint16_t port)
 {

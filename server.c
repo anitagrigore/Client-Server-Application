@@ -24,7 +24,7 @@ int main(int argc, char** argv)
   //    =>stdin -> handle_keyboard_input -> daca exit, break
 
     if (argc < 2) {
-
+      fprintf(stderr, "usage: server port_number\n");
       return -1;
     }
 

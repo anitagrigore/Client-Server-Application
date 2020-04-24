@@ -39,7 +39,7 @@ int server_tcp(uint16_t port_nr)
 
 int handle_tcp_client(struct context* ctx, int sockfd_tcp)
 {
-  struct client_tcp *client = malloc(sizeof(struct client_tcp*));
+  struct client_tcp *client = calloc(1, sizeof(struct client_tcp));
   client->addrlen = sizeof(struct sockaddr_storage);
 
   int sockfd_cli = accept(sockfd_tcp, (struct sockaddr*) &client->addr, &client->addrlen);
@@ -49,7 +49,7 @@ int handle_tcp_client(struct context* ctx, int sockfd_tcp)
   }
 
   client->sockfd = sockfd_cli;
-  list_insert(ctx->pending, client, NULL);
+  list_insert(ctx->pending, client, ctx->pending->tail);
 
   return 0;
 }
