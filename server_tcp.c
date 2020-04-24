@@ -56,45 +56,53 @@ int handle_tcp_client(struct context* ctx, int sockfd_tcp)
 
 int handle_hello_message(struct context* ctx, int sockfd, char *id)
 {
-  struct client_tcp* client = NULL;
-  struct list_node* curr;
-  for (curr = ctx->pending->head; curr != NULL; curr = curr->next) {
+  struct client_tcp* pending_conn = NULL;
+  struct list_node* pending_conn_node = NULL;
+  for (struct list_node* curr = ctx->pending->head; curr != NULL; curr = curr->next) {
     struct client_tcp* c = curr->data;
     if (c->sockfd == sockfd) {
-      client = c;
+      pending_conn = c;
+      pending_conn_node = curr;
       break;
     }
   }
 
-  if (client == NULL) {
+  if (pending_conn == NULL) {
     printf("Unexpected hello message.\n");
     return -1;
   }
 
-  for (curr = ctx->clients->head; curr != NULL; curr = curr->next) {
+  for (struct list_node* curr = ctx->clients->head; curr != NULL; curr = curr->next) {
     struct client_tcp* c = curr->data;
 
     if (strcmp(c->id, id) == 0) {
       if (c->sockfd == -1) {
         c->sockfd = sockfd;
-        c->addr = client->addr;
-        c->addrlen = client->addrlen;
+        c->addr = pending_conn->addr;
+        c->addrlen = pending_conn->addrlen;
 
         printf("Client %s reconnected.\n", id);
 
         list_delete(ctx->pending, curr);
+        return 0;
       } else {
         // eroare
+        
         printf("Username is already in use.\n");
+        list_delete(ctx->pending, curr);
         return -1;
       }
-    } else {
-      memcpy(client->id, id, sizeof(client->id));
-      list_insert(ctx->clients, client, ctx->clients->tail);
-
-      printf("Client %s connected.\n", id);
     }
   }
+  
+  struct client_tcp *client = calloc(1, sizeof(struct client_tcp));
+  memcpy(client, pending_conn, sizeof(struct client_tcp));
+  memcpy(client->id, id, sizeof(client->id));
+  
+  list_delete(ctx->pending, pending_conn_node);  // Remove the pending connection
+  list_insert(ctx->clients, client, ctx->clients->tail);  // Add the new client to known clients list.
+
+  printf("Client %s connected.\n", id);
 
   return 0;
 }
