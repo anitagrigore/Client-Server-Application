@@ -34,19 +34,19 @@ int server_udp(uint16_t port)
 
 int handle_udp_message(struct context* ctx, int sockfd_udp)
 {
-  struct udp_message p = {0};
-  p.addr.addrlen = sizeof(p.addr.addr);
+  struct udp_message *p = calloc(1, sizeof(struct udp_message));
+  p->addr.addrlen = sizeof(p->addr.addr);
 
-  ssize_t n_recv = recvfrom(sockfd_udp, &p.message, sizeof(p.message), 0,
-        (struct sockaddr*) &p.addr.addr, &p.addr.addrlen);
+  ssize_t n_recv = recvfrom(sockfd_udp, &p->message, sizeof(p->message), 0,
+        (struct sockaddr*) &p->addr.addr, &p->addr.addrlen);
   if (n_recv == -1) {
     //eroare
     return -1;
   }
 
-  list_insert(ctx->message_list, &p, ctx->message_list->tail);
+  list_insert(ctx->message_list, p, ctx->message_list->tail);
 
-  print_udp_message(&p);
+  print_udp_message(p);
 
   return 0;
 }
