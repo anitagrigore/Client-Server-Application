@@ -33,7 +33,7 @@ int Server_TCP::start()
   }
   
   int f = 1;
-  if (setsockopt(sockfd_tcp, SOL_TCP, TCP_NODELAY, &f, sizeof(f)) == -1)
+  if (setsockopt(sockfd_tcp, IPPROTO_TCP, TCP_NODELAY, &f, sizeof(f)) == -1)
   {
     close(sockfd_tcp);
     perror("setsockopt");
