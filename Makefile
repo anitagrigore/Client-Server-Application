@@ -1,16 +1,14 @@
-CFLAGS=-std=gnu99 -g -Iinclude
-CC=gcc
+CPPFLAGS=-std=c++14 -g -Iinclude
+CC=g++
 
-server: server.o server_tcp.o server_udp.o linkedlist.o
+server: server.o server_tcp.o server_udp.o
 	$(CC) $^ -o server -lm
 
-server.o: server.c
+server.o: server.cpp
 
-linkedlist.o: linkedlist.c
+server_tcp.o: server_tcp.cpp include/context_manager.h include/helper.h
 
-server_tcp.o: server_tcp.c include/helper.h
-
-server_udp.o: server_udp.c include/helper.h 
+server_udp.o: server_udp.cpp include/context_manager.h include/helper.h 
 
 clean:
 	rm *.o server

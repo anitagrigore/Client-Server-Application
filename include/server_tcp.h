@@ -1,13 +1,32 @@
 #pragma once
-#include <stdint.h>
+
+#include <string>
+#include <cstdint>
 
 #include "helper.h"
-#include "linkedlist.h"
+#include "context_manager.h"
 
-int server_tcp(uint16_t port_nr);
-
-int handle_tcp_client(struct context* ctx, int sockfd_tcp);
-
-int handle_tcp_message(struct context* ctx, int sockfd);
-
-int handle_hello_message(struct context* ctx, int sockfd, char* id);
+class Server_TCP
+{
+  int port;
+  ContextManager &ctx;
+  int server_sock = -1;
+  
+public:
+  Server_TCP(ContextManager &ctx, int port) : ctx{ctx}, port{port}
+  {}
+  
+  int start();
+  
+  int handle_client();
+  int handle_message(int clientfd);
+  
+  int get_fd() const
+  {
+    return server_sock;
+  }
+  
+private:
+  int handle_hello_message(int clientfd, const std::string &id);
+  void disconnect_client(int clientfd);
+};
