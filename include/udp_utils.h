@@ -139,10 +139,10 @@ struct UDPMessage
     auto preamble = (UDPPreamble *) buf;
     auto msg_body = (char *) (buf + sizeof(UDPPreamble));
 
-    preamble->msg_len = htons(msg_str.size());
+    preamble->msg_len = htons(msg_str.size() + 1);
     memcpy(msg_body, msg_str.c_str(), msg_str.size());
 
-    return msg_str.size() + sizeof(UDPPreamble);
+    return msg_str.size() + 1 + sizeof(UDPPreamble);
   }
 };
 
