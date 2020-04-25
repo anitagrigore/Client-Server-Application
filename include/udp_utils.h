@@ -45,7 +45,12 @@ struct UDPMessageHeader
     IntMessage int_msg;
     ShortRealMessage short_real_msg;
     FloatMessage float_msg;
-  };
+  } __attribute__((packed));
+} __attribute__((packed));
+
+struct UDPPreamble
+{
+  uint16_t msg_len;
 } __attribute__((packed));
 
 struct AddressHeader
@@ -57,10 +62,10 @@ struct AddressHeader
 
 struct UDPMessage
 {
-  UDPMessageHeader message;
   AddressHeader source;
+  UDPMessageHeader message;
 
-  void print()
+  void print() const
   {
     char host[NI_MAXHOST] = {0};
     char service[NI_MAXSERV] = {0};
@@ -117,5 +122,43 @@ struct UDPMessage
     }
   
     printf("\n");
+  }
+  
+  size_t serialize(void *out) const
+  {
+    uint8_t *buf = (uint8_t *) out;
+    
+    auto preamble = (UDPPreamble *) buf;
+    auto msg_source = (AddressHeader *) (buf + sizeof(UDPPreamble));
+    auto msg_body = (UDPMessageHeader *) (buf + sizeof(UDPPreamble) + sizeof(AddressHeader));
+
+    preamble->msg_len = 0;
+    
+    memcpy(msg_source, &source, sizeof(AddressHeader));
+    preamble->msg_len += sizeof(AddressHeader);
+    
+    size_t msg_body_len = 0;
+    
+    switch (message.type) {
+    case INT:
+      msg_body_len += sizeof(IntMessage);
+      break;
+    case SHORT_REAL:
+      msg_body_len += sizeof(ShortRealMessage);
+      break;
+    case FLOAT:
+      msg_body_len += sizeof(FloatMessage);
+      break;
+    case STRING:
+      msg_body_len += std::min<size_t>(MAX_PAYLOAD_LEN, strlen(message.string_msg));
+      break;
+    }
+    
+    msg_body_len += MAX_TOPIC_LEN + 1;
+    preamble->msg_len += msg_body_len;
+    
+    memcpy(msg_body, &message, msg_body_len);
+    
+    return preamble->msg_len + sizeof(UDPPreamble);
   }
 };

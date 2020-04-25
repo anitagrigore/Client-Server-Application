@@ -20,6 +20,7 @@ public:
   
   int handle_client();
   int handle_message(int clientfd);
+  int share_messages();
   
   int get_fd() const
   {

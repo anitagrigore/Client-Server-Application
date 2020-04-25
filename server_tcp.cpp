@@ -22,6 +22,14 @@ int Server_TCP::start()
     perror("socket_tcp");
     return -1;
   }
+  
+  int val = 1;
+  if (setsockopt(sockfd_tcp, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) == -1)
+  {
+    close(sockfd_tcp);
+    perror("setsockopt");
+    return -1;
+  }
 
   struct sockaddr_in server_addr;
   server_addr.sin_family = AF_INET;
@@ -114,6 +122,36 @@ int Server_TCP::handle_message(int clientfd)
   }
 
   return n_read;
+}
+
+int Server_TCP::share_messages()
+{
+  
+  while (!ctx.pending_messages.empty()) {
+    auto &msg = ctx.pending_messages.front();
+    char buf[2048]{};
+    auto n = msg.serialize(buf);
+
+    for (auto &client : ctx.clients) {
+      if (!client.is_subscribed_to(msg.message.topic)) {
+        continue;
+      }
+
+      if (client.sockfd == -1) {
+        client.pending_messages.push(msg);
+      } else {
+        if (write(client.sockfd, buf, n) == -1) {
+          perror("send");
+
+          return -1;
+        }
+      }
+    }
+    
+    ctx.pending_messages.pop();
+  }
+  
+  return 0;
 }
 
 int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
@@ -230,5 +268,48 @@ int Server_TCP::handle_unsubscribe_message(int clientfd, const std::string &topi
 
 void Server_TCP::disconnect_client(int clientfd)
 {
-  std::cout << "TODO: Disconnecting client " << clientfd << "\n";
+  auto pending_conn = std::find_if(
+      ctx.pending_conns.begin(),
+      ctx.pending_conns.end(),
+      [&](auto &&c) { return c.sockfd == clientfd; });
+  if (pending_conn != ctx.pending_conns.end()) {
+    std::cout << "Disconnected pending connection: " << clientfd << "\n";
+    
+    ctx.pending_conns.erase(pending_conn);
+    return;
+  }
+
+  // The client has been registered already. Clean their subscriptions.
+  
+  auto client = std::find_if(
+      ctx.clients.begin(),
+      ctx.clients.end(),
+      [&](auto &&c) { return c.sockfd == clientfd; });
+  
+  assert(client != ctx.clients.end());
+  
+  bool has_sf_subscrptions = false;
+  for (auto it = client->subscriptions.begin(); it != client->subscriptions.end();) {
+    auto &topic = it->first;
+    auto sf = it->second;
+    
+    if (!sf) {
+      std::cout << "Removed subscription (" << client->id << ", " << topic << ")\n";
+      it = client->subscriptions.erase(it);
+    } else {
+      has_sf_subscrptions = true;
+      it++;
+    }
+  }
+  
+  if (!has_sf_subscrptions) {
+    std::cout << "Removing client information for " << client->id << "\n";
+  
+    ctx.clients.erase(client);
+    return;
+  }
+  
+  std::cout << "Keeping client info due to SF subscriptions: " << client->id << "\n";
+  
+  client->sockfd = -1;
 }

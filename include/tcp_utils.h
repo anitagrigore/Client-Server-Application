@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <utility> 
 #include <vector>
+#include <queue>
 
 #include "data_limits.h"
+#include "udp_utils.h"
 
 using Subscription = std::pair<std::string, bool>;
 
@@ -16,6 +18,18 @@ struct TCPClient
   socklen_t addrlen;
   int sockfd;
   std::vector<Subscription> subscriptions;
+  std::queue<UDPMessage> pending_messages;
+  
+  bool is_subscribed_to(std::string topic) const
+  {
+    for (auto sub = subscriptions.begin(); sub != subscriptions.end();) {
+      if (sub->first == topic) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
 };
 
 enum TCPMessageType

@@ -45,7 +45,6 @@ int main(int argc, char** argv)
 
   Server_TCP tcp_server{ctx, port};
   tcp_server.start();
-
   DIE(tcp_server.get_fd() == -1, "tcp server failed to start");
 
   FD_SET(udp_server.get_fd(), &read_fds);
@@ -57,6 +56,10 @@ int main(int argc, char** argv)
     tmp_fds = read_fds;
 
     int ret = select(fdmax + 1, &tmp_fds, NULL, NULL, NULL);
+    if (ret < 0) {
+      perror("select");
+      exit(EXIT_FAILURE);
+    }
 
     for (int i = 0; i <= fdmax; i++) {
       if (!FD_ISSET(i, &tmp_fds)) {
@@ -65,6 +68,7 @@ int main(int argc, char** argv)
       
       if (i == udp_server.get_fd()) {
         udp_server.handle_message();
+        tcp_server.share_messages();
       } else if (i == tcp_server.get_fd()) {
         int clientfd = tcp_server.handle_client();
 
