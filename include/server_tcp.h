@@ -28,5 +28,8 @@ public:
   
 private:
   int handle_hello_message(int clientfd, const std::string &id);
+  int handle_subscribe_message(int clientfd, const std::string &topic, bool store_forward);
+  int handle_unsubscribe_message(int clientfd, const std::string &topic);
+  
   void disconnect_client(int clientfd);
 };

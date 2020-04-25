@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <iostream>
 #include <algorithm>
+#include <cassert>
 
 #include "server_tcp.h"
 #include "tcp_utils.h"
@@ -59,6 +60,62 @@ int Server_TCP::handle_client()
   return clientfd;
 }
 
+int Server_TCP::handle_message(int clientfd)
+{
+  char buf[MAX_PAYLOAD_LEN] = {0};
+  int n_read = read(clientfd, buf, sizeof(buf));
+  if (n_read == -1) {
+    perror("handle_message: read");
+    return -1;
+  }
+
+  if (n_read == 0) {
+    disconnect_client(clientfd);
+    return 0;
+  }
+
+  printf("tcp_msg_buffer = ");
+  for (int i = 0; i < n_read; i++)
+  {
+    printf("%02x ", buf[i] & 0xff);
+  }
+  printf("\n");
+
+  TCPMessageHeader* hdr = (TCPMessageHeader*) buf;
+  char* payload = buf + sizeof(TCPMessageHeader);
+
+  switch (hdr->type) {
+    case HELLO:
+    {
+      char id[MAX_ID_LEN + 1]{};
+      memcpy(id, payload, sizeof(std::min<size_t>(MAX_ID_LEN, ntohs(hdr->size))));
+      
+      handle_hello_message(clientfd, std::string(id));
+      break;
+    }
+    case SUBSCRIBE:
+    {
+      auto subscribe_msg = (TCPSubscribeMsg *) payload;
+      char topic[MAX_TOPIC_LEN + 1]{};
+      memcpy(topic, subscribe_msg->topic, MAX_TOPIC_LEN);
+      
+      handle_subscribe_message(clientfd, std::string(topic), subscribe_msg->sf);
+      break;
+    }
+    case UNSUBSCRIBE:
+    {
+      auto unsubscribe_msg = (TCPUnsubscribeMsg *) payload;
+      char topic[MAX_TOPIC_LEN + 1]{};
+      memcpy(topic, unsubscribe_msg->topic, MAX_TOPIC_LEN);
+      
+      handle_unsubscribe_message(clientfd, std::string(topic));
+      break;
+    }
+  }
+
+  return n_read;
+}
+
 int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
 {
   auto pending_conn = ctx.pending_conns.end();
@@ -105,42 +162,70 @@ int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
   return 0;
 }
 
-int Server_TCP::handle_message(int clientfd)
+int Server_TCP::handle_subscribe_message(int clientfd, const std::string &topic, bool sf)
 {
-  char buf[MAX_PAYLOAD_LEN] = {0};
-  int n_read = read(clientfd, buf, sizeof(buf));
-  if (n_read == -1) {
-    perror("handle_message: read");
+  auto is_pending = std::find_if(
+      ctx.pending_conns.begin(),
+      ctx.pending_conns.end(),
+      [&](auto &&c) { return c.sockfd == clientfd; }) != ctx.pending_conns.end();
+
+  if (is_pending) {
+    // Expecting HELLO message from pending connection instead.
     return -1;
   }
+  
+  auto client = std::find_if(
+      ctx.clients.begin(),
+      ctx.clients.end(),
+      [&](auto &&c) { return c.sockfd == clientfd; });
+  
+  assert(client != ctx.clients.end());
+  
+  auto has_subscription = std::find_if(
+      client->subscriptions.begin(),
+      client->subscriptions.end(),
+      [&](auto &&c) { return c.first == topic; }) != client->subscriptions.end();
+  if (has_subscription)
+  {
+    // A subscription already exists. Silently ignore. Treat as success.
+    return 0;
+  }
+  
+  client->subscriptions.emplace_back(topic, sf);
+  return 0;
+}
 
-  if (n_read == 0) {
-    disconnect_client(clientfd);
+int Server_TCP::handle_unsubscribe_message(int clientfd, const std::string &topic)
+{
+  auto is_pending = std::find_if(
+      ctx.pending_conns.begin(),
+      ctx.pending_conns.end(),
+      [&](auto &&c) { return c.sockfd == clientfd; }) != ctx.pending_conns.end();
+
+  if (is_pending) {
+    // Expecting HELLO message from pending connection instead.
+    return -1;
+  }
+  
+  auto client = std::find_if(
+      ctx.clients.begin(),
+      ctx.clients.end(),
+      [&](auto &&c) { return c.sockfd == clientfd; });
+  
+  assert(client != ctx.clients.end());
+  
+  auto subscription = std::find_if(
+      client->subscriptions.begin(),
+      client->subscriptions.end(),
+      [&](auto &&c) { return c.first == topic; });
+  if (subscription == client->subscriptions.end())
+  {
+    // A subscription does not exist. Silently ignore this.
     return 0;
   }
 
-  printf("tcp_msg_buffer = ");
-  for (int i = 0; i < n_read; i++)
-  {
-    printf("%02x ", buf[i] & 0xff);
-  }
-  printf("\n");
-
-  TCPMessageHeader* hdr = (TCPMessageHeader*) buf;
-  char* payload = buf + sizeof(TCPMessageHeader);
-
-  switch (hdr->type) {
-    case HELLO:
-    {
-      char id[MAX_ID_LEN + 1]{};
-      memcpy(id, payload, sizeof(std::min<size_t>(MAX_ID_LEN, ntohs(hdr->size))));
-      
-      handle_hello_message(clientfd, std::string(id));
-      break;
-    }
-  }
-
-  return n_read;
+  client->subscriptions.erase(subscription);
+  return 0;
 }
 
 void Server_TCP::disconnect_client(int clientfd)
