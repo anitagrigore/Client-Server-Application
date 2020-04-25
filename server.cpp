@@ -1,25 +1,24 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <vector>
 
-#include "helper.h"
 #include "context_manager.h"
-#include "server_udp.h"
+#include "helper.h"
 #include "server_tcp.h"
+#include "server_udp.h"
 
-int main(int argc, char** argv)
-{
-  //fd-uri
-  //apelez functia pt sockfd_udp
-  //apelez functia pr socket_tcp
-  //fd_read += sockfd_udp + sockfd_tcp +stdin
-  //select in while(1) => verific nr socket (daca e de udp sau tcp)
+int main(int argc, char **argv) {
+  // fd-uri
+  // apelez functia pt sockfd_udp
+  // apelez functia pr socket_tcp
+  // fd_read += sockfd_udp + sockfd_tcp +stdin
+  // select in while(1) => verific nr socket (daca e de udp sau tcp)
   //    =>udp -> handle_message_udp
   //    =>tcp -> handle_conections (accept + altele)
   //    =>stdin -> handle_keyboard_input -> daca exit, break
@@ -38,7 +37,7 @@ int main(int argc, char** argv)
   FD_ZERO(&tmp_fds);
 
   int port = atoi(argv[1]);
-  
+
   Server_UDP udp_server{ctx, port};
   udp_server.start();
   DIE(udp_server.get_fd() == -1, "udp server failed to start");
@@ -50,10 +49,10 @@ int main(int argc, char** argv)
   FD_SET(STDIN_FILENO, &read_fds);
   FD_SET(udp_server.get_fd(), &read_fds);
   FD_SET(tcp_server.get_fd(), &read_fds);
-  
+
   fdmax = tcp_server.get_fd();
 
-  while(1) {
+  while (1) {
     tmp_fds = read_fds;
 
     int ret = select(fdmax + 1, &tmp_fds, NULL, NULL, NULL);
@@ -66,7 +65,7 @@ int main(int argc, char** argv)
       if (!FD_ISSET(i, &tmp_fds)) {
         continue;
       }
-      
+
       if (i == udp_server.get_fd()) {
         udp_server.handle_message();
         tcp_server.share_messages();
@@ -82,7 +81,7 @@ int main(int argc, char** argv)
           perror("read");
           return -1;
         }
-        
+
         if (strstr(buf, "exit")) {
           return 0;
         }
