@@ -135,7 +135,7 @@ int Client_TCP::handle_command()
       std::cerr << "Failed to send message.\n";
       return -1;
     } else {
-      std::cout << "Subscribed to " << tokens[1] << "\n";
+      std::cout << "Unsubscribed from " << tokens[1] << "\n";
     }
     
     return 1;

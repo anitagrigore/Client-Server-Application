@@ -98,7 +98,7 @@ int Server_TCP::handle_message(int clientfd)
     case HELLO:
     {
       char id[MAX_ID_LEN + 1]{};
-      memcpy(id, payload, sizeof(std::min<size_t>(MAX_ID_LEN, ntohs(hdr->size))));
+      memcpy(id, payload, std::min<size_t>(MAX_ID_LEN, ntohs(hdr->size)));
       
       handle_hello_message(clientfd, std::string(id));
       break;
@@ -132,23 +132,15 @@ int Server_TCP::share_messages()
     auto &msg = ctx.pending_messages.front();
     char buf[3072]{};
     auto n = msg.serialize(buf);
-    
-    printf("Sharing message on topic: %s\n", msg.message.topic);
 
     for (auto &client : ctx.clients) {
       if (!client.is_subscribed_to(msg.message.topic)) {
         continue;
       }
-      
-      printf("Client %s is subscribed to topic.\n", client.id.c_str());
 
       if (client.sockfd == -1) {
-        printf("Client is offline. Keeping the message there.\n");
-        
         client.pending_messages.push(msg);
       } else {
-        printf("Sending message.\n");
-
         if (write(client.sockfd, buf, n) == -1) {
           perror("send");
 
@@ -175,7 +167,6 @@ int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
   }
 
   if (pending_conn == ctx.pending_conns.end()) {
-    std::cerr << "Unexpected hello message.\n";
     return -1;
   }
 
@@ -186,7 +177,7 @@ int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
         c.addr = pending_conn->addr;
         c.addrlen = pending_conn->addrlen;
 
-        std::cout << "Client " << id << " reconnected.\n";
+        std::cout << "New client \"" << id << "\" connected from " << c.addr_str() << ".\n";
 
         ctx.pending_conns.erase(pending_conn);
         
@@ -206,7 +197,6 @@ int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
         }
         return 0;
       } else {
-        std::cerr << "Username is already in use.\n";
         ctx.pending_conns.erase(pending_conn);
         return -1;
       }
@@ -219,7 +209,7 @@ int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
   ctx.pending_conns.erase(pending_conn); // Remove the pending connection
   ctx.clients.push_back(client);  // Add the new client to known clients list.
 
-  std::cout << "Client " << id << " connected.\n";
+  std::cout << "New client \"" << id << "\" connected from " << client.addr_str() << ".\n";
 
   return 0;
 }
@@ -250,11 +240,9 @@ int Server_TCP::handle_subscribe_message(int clientfd, const std::string &topic,
   if (has_subscription)
   {
     // A subscription already exists. Silently ignore. Treat as success.
-    printf("Client %s is already subscribed to topic %s\n", client->id.c_str(), topic.c_str());
     return 0;
   }
   
-  printf("Client %s subscribed to topic %s\n.", client->id.c_str(), topic.c_str());
   client->subscriptions.emplace_back(topic, sf);
   return 0;
 }
@@ -299,8 +287,6 @@ void Server_TCP::disconnect_client(int clientfd)
       ctx.pending_conns.end(),
       [&](auto &&c) { return c.sockfd == clientfd; });
   if (pending_conn != ctx.pending_conns.end()) {
-    std::cout << "Disconnected pending connection: " << clientfd << "\n";
-    
     ctx.pending_conns.erase(pending_conn);
     return;
   }
@@ -320,7 +306,6 @@ void Server_TCP::disconnect_client(int clientfd)
     auto sf = it->second;
     
     if (!sf) {
-      std::cout << "Removed subscription (" << client->id << ", " << topic << ")\n";
       it = client->subscriptions.erase(it);
     } else {
       has_sf_subscrptions = true;
@@ -328,14 +313,12 @@ void Server_TCP::disconnect_client(int clientfd)
     }
   }
   
-  if (!has_sf_subscrptions) {
-    std::cout << "Removing client information for " << client->id << "\n";
+  std::cout << "Client \"" << client->id << "\" disconnected.\n";
   
+  if (!has_sf_subscrptions) {
     ctx.clients.erase(client);
     return;
   }
-  
-  std::cout << "Keeping client info due to SF subscriptions: " << client->id << "\n";
   
   client->sockfd = -1;
 }

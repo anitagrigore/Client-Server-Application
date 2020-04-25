@@ -47,6 +47,7 @@ int main(int argc, char** argv)
   tcp_server.start();
   DIE(tcp_server.get_fd() == -1, "tcp server failed to start");
 
+  FD_SET(STDIN_FILENO, &read_fds);
   FD_SET(udp_server.get_fd(), &read_fds);
   FD_SET(tcp_server.get_fd(), &read_fds);
   
@@ -75,10 +76,17 @@ int main(int argc, char** argv)
         FD_SET(clientfd, &read_fds);
         fdmax = std::max(clientfd, fdmax);
       } else if (i == STDIN_FILENO) {
-
+        char buf[16]{};
+        ssize_t nread = read(STDIN_FILENO, buf, sizeof(buf));
+        if (nread == -1) {
+          perror("read");
+          return -1;
+        }
+        
+        if (strstr(buf, "exit")) {
+          return 0;
+        }
       } else {
-        printf("Socket ready: %d\n", i);
-
         if (tcp_server.handle_message(i) <= 0) {
           close(i);
           FD_CLR(i, &read_fds);

@@ -30,6 +30,23 @@ struct TCPClient
     
     return false;
   }
+  
+  std::string addr_str() const
+  {
+    char host[NI_MAXHOST] = {0};
+    char service[NI_MAXSERV] = {0};
+    int err = getnameinfo((struct sockaddr*) &addr, addrlen, host, sizeof(host), service, sizeof(service),
+        NI_NUMERICHOST | NI_NUMERICSERV);
+  
+    if (err != 0) {
+      return "";
+    }
+    
+    char buf[NI_MAXHOST + NI_MAXSERV + 2]{};
+    snprintf(buf, sizeof(buf), "%s:%s", host, service);
+    
+    return buf;
+  }
 };
 
 enum TCPMessageType
