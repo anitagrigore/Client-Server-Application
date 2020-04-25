@@ -22,7 +22,7 @@ struct TCPClient
   
   bool is_subscribed_to(std::string topic) const
   {
-    for (auto sub = subscriptions.begin(); sub != subscriptions.end();) {
+    for (auto sub = subscriptions.begin(); sub != subscriptions.end(); sub++) {
       if (sub->first == topic) {
         return true;
       }

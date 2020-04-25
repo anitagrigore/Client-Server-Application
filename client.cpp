@@ -32,14 +32,13 @@ int main(int argc, char** argv)
   tcp_client.say_hello(argv[1]);
   
   fd_set read_fds, temp_fds;
-  int fdmax;
-  
+
   FD_ZERO(&read_fds);
   FD_ZERO(&temp_fds);
   
   FD_SET(STDIN_FILENO, &read_fds);
   FD_SET(tcp_client.get_fd(), &read_fds);
-  fdmax = tcp_client.get_fd();
+  int fdmax = tcp_client.get_fd();
   
   bool finished = false;
   while(!finished) {

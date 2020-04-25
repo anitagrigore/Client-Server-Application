@@ -65,29 +65,33 @@ struct UDPMessage
   AddressHeader source;
   UDPMessageHeader message;
 
-  void print() const
+  std::string str() const
   {
+    char buf[2048]{};
+    std::string output;
+    
     char host[NI_MAXHOST] = {0};
     char service[NI_MAXSERV] = {0};
     int err = getnameinfo((struct sockaddr*) &source.addr, source.addrlen, host, sizeof(host), service, sizeof(service),
         NI_NUMERICHOST | NI_NUMERICSERV);
   
     if (err != 0) {
-      fprintf(stderr, "Error: %s\n", gai_strerror(err));
-      return;
+      return output;
     }
   
     char topic[MAX_TOPIC_LEN + 1] = {0};
     memcpy(topic, message.topic, sizeof(message.topic));
   
-    printf("%s:%s - %s ", host, service, topic);
+    sprintf(buf, "%s:%s - %s ", host, service, topic);
+    output.append(buf, strlen(buf));
   
     switch (message.type) {
       case INT:
       {
         uint32_t value = ntohl(message.int_msg.value);
   
-        printf("- INT - %s%d", message.int_msg.sign ? "-" : "", value);
+        sprintf(buf, "- INT - %s%d", message.int_msg.sign ? "-" : "", value);
+        output.append(buf, strlen(buf));
         break;
       }
       case SHORT_REAL:
@@ -96,7 +100,8 @@ struct UDPMessage
         uint16_t fractional = value % 100;
         uint16_t integral = value / 100;
   
-        printf("- SHORT_REAL - %d.%02d", integral, fractional);
+        sprintf(buf, "- SHORT_REAL - %d.%02d", integral, fractional);
+        output.append(buf, strlen(buf));
         break;
       }
       case FLOAT:
@@ -107,58 +112,47 @@ struct UDPMessage
         uint32_t fractional = value % p10;
         uint32_t integral = value / p10;
   
-        printf("- FLOAT - %s%d.%0*d", message.float_msg.sign ? "-" : "", integral,
+        sprintf(buf, "- FLOAT - %s%d.%0*d", message.float_msg.sign ? "-" : "", integral,
             modulo, fractional);
+        output.append(buf, strlen(buf));
         break;
       }
       case STRING:
       {
-        char buf[MAX_PAYLOAD_LEN + 1] = {0};
-        memcpy(buf, message.string_msg, sizeof(message.string_msg));
+        char payload[MAX_PAYLOAD_LEN + 1] = {0};
+        memcpy(payload, message.string_msg, sizeof(message.string_msg));
   
-        printf("- STRING - %s", buf);
+        sprintf(buf, "- STRING - %s", payload);
+        output.append(buf, strlen(buf));
         break;
       }
     }
   
-    printf("\n");
+    return output;
   }
   
   size_t serialize(void *out) const
   {
     uint8_t *buf = (uint8_t *) out;
+    auto msg_str = str();
     
     auto preamble = (UDPPreamble *) buf;
-    auto msg_source = (AddressHeader *) (buf + sizeof(UDPPreamble));
-    auto msg_body = (UDPMessageHeader *) (buf + sizeof(UDPPreamble) + sizeof(AddressHeader));
+    auto msg_body = (char *) (buf + sizeof(UDPPreamble));
 
-    preamble->msg_len = 0;
-    
-    memcpy(msg_source, &source, sizeof(AddressHeader));
-    preamble->msg_len += sizeof(AddressHeader);
-    
-    size_t msg_body_len = 0;
-    
-    switch (message.type) {
-    case INT:
-      msg_body_len += sizeof(IntMessage);
-      break;
-    case SHORT_REAL:
-      msg_body_len += sizeof(ShortRealMessage);
-      break;
-    case FLOAT:
-      msg_body_len += sizeof(FloatMessage);
-      break;
-    case STRING:
-      msg_body_len += std::min<size_t>(MAX_PAYLOAD_LEN, strlen(message.string_msg));
-      break;
-    }
-    
-    msg_body_len += MAX_TOPIC_LEN + 1;
-    preamble->msg_len += msg_body_len;
-    
-    memcpy(msg_body, &message, msg_body_len);
-    
-    return preamble->msg_len + sizeof(UDPPreamble);
+    preamble->msg_len = htons(msg_str.size());
+    memcpy(msg_body, msg_str.c_str(), msg_str.size());
+
+    return msg_str.size() + sizeof(UDPPreamble);
   }
 };
+
+static bool can_parse_message(uint8_t *buf, size_t len)
+{
+  if (len <= sizeof(UDPPreamble))
+  {
+    return false;
+  }
+  
+  auto preamble = (UDPPreamble *) buf;
+  return len - sizeof(UDPPreamble) >= ntohs(preamble->msg_len);
+}

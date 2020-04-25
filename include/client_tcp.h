@@ -8,8 +8,11 @@ class Client_TCP
   int fd = -1;
   std::string ip;
   
+  uint8_t *data_fragment = nullptr;
+  size_t fragment_size = 0;
+
 public:
-  Client_TCP(std::string ip, int port) : ip{ip}, port{port}
+  Client_TCP(std::string ip, int port) : ip{ip}, port{port}, data_fragment{nullptr}, fragment_size{0}
   {}
   
   int start();

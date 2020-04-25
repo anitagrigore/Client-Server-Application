@@ -9,6 +9,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cassert>
+#include <netinet/tcp.h>
 
 #include "server_tcp.h"
 #include "tcp_utils.h"
@@ -25,6 +26,14 @@ int Server_TCP::start()
   
   int val = 1;
   if (setsockopt(sockfd_tcp, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) == -1)
+  {
+    close(sockfd_tcp);
+    perror("setsockopt");
+    return -1;
+  }
+  
+  int f = 1;
+  if (setsockopt(sockfd_tcp, SOL_TCP, TCP_NODELAY, &f, sizeof(f)) == -1)
   {
     close(sockfd_tcp);
     perror("setsockopt");
@@ -82,13 +91,6 @@ int Server_TCP::handle_message(int clientfd)
     return 0;
   }
 
-  printf("tcp_msg_buffer = ");
-  for (int i = 0; i < n_read; i++)
-  {
-    printf("%02x ", buf[i] & 0xff);
-  }
-  printf("\n");
-
   TCPMessageHeader* hdr = (TCPMessageHeader*) buf;
   char* payload = buf + sizeof(TCPMessageHeader);
 
@@ -126,20 +128,27 @@ int Server_TCP::handle_message(int clientfd)
 
 int Server_TCP::share_messages()
 {
-  
   while (!ctx.pending_messages.empty()) {
     auto &msg = ctx.pending_messages.front();
-    char buf[2048]{};
+    char buf[3072]{};
     auto n = msg.serialize(buf);
+    
+    printf("Sharing message on topic: %s\n", msg.message.topic);
 
     for (auto &client : ctx.clients) {
       if (!client.is_subscribed_to(msg.message.topic)) {
         continue;
       }
+      
+      printf("Client %s is subscribed to topic.\n", client.id.c_str());
 
       if (client.sockfd == -1) {
+        printf("Client is offline. Keeping the message there.\n");
+        
         client.pending_messages.push(msg);
       } else {
+        printf("Sending message.\n");
+
         if (write(client.sockfd, buf, n) == -1) {
           perror("send");
 
@@ -180,6 +189,21 @@ int Server_TCP::handle_hello_message(int clientfd, const std::string &id)
         std::cout << "Client " << id << " reconnected.\n";
 
         ctx.pending_conns.erase(pending_conn);
+        
+        while (!c.pending_messages.empty())
+        {
+          auto &msg = c.pending_messages.front();
+          char buf[2048]{};
+          auto n = msg.serialize(buf);
+          
+          if (write(c.sockfd, buf, n) == -1) {
+            perror("send");
+  
+            return -1;
+          }
+          
+          c.pending_messages.pop();
+        }
         return 0;
       } else {
         std::cerr << "Username is already in use.\n";
@@ -226,9 +250,11 @@ int Server_TCP::handle_subscribe_message(int clientfd, const std::string &topic,
   if (has_subscription)
   {
     // A subscription already exists. Silently ignore. Treat as success.
+    printf("Client %s is already subscribed to topic %s\n", client->id.c_str(), topic.c_str());
     return 0;
   }
   
+  printf("Client %s subscribed to topic %s\n.", client->id.c_str(), topic.c_str());
   client->subscriptions.emplace_back(topic, sf);
   return 0;
 }

@@ -49,8 +49,6 @@ int Server_UDP::handle_message()
   }
 
   ctx.pending_messages.push(p);
-  
-  p.print();
 
   return 0;
 }

@@ -16,6 +16,7 @@
 #include "tcp_utils.h"
 #include "data_limits.h"
 #include "helper.h"
+#include "udp_utils.h"
 
 int Client_TCP::start()
 {
@@ -159,11 +160,45 @@ int Client_TCP::handle_server_message()
   {
     return 0;
   }
+
+  // Concatenate the buffer being read with the data fragment.
+  uint8_t *temp = (uint8_t *) calloc(fragment_size + nread, 1);
+  if (fragment_size) {
+    memcpy(temp, data_fragment, fragment_size);
+  }
+  memcpy(temp + fragment_size, buf, nread);
+  fragment_size += nread;
   
-  uint16_t *payload_len = (uint16_t *) buf;
-  UDPMessage *payload = (UDPMessage *) (buf + sizeof(uint16_t));
-  
-  payload->print();
+  free(data_fragment);
+  data_fragment = temp;
+
+  while (can_parse_message(data_fragment, fragment_size)) {
+    auto preamble = (UDPPreamble *) data_fragment;
+    auto payload = (char *) (data_fragment + sizeof(UDPPreamble));
+
+    std::cout << payload << "\n";
+
+    // Trim what was parsed from the data fragment
+    auto parsed_size = ntohs(preamble->msg_len) + sizeof(UDPPreamble);
+    if (fragment_size - parsed_size == 0) {
+      free(data_fragment);
+      data_fragment = nullptr;
+      fragment_size = 0;
+      
+      break;
+    }
+
+    temp = (uint8_t *) malloc(fragment_size - parsed_size);
+    if (!temp) {
+      perror("malloc");
+      return -1;
+    }
+    
+    memcpy(temp, data_fragment + parsed_size, fragment_size - parsed_size);
+    free(data_fragment);
+    data_fragment = temp;
+    fragment_size -= parsed_size;
+  }
   
   return 1;
 }
