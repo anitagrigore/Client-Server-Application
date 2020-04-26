@@ -14,15 +14,6 @@
 #include "server_udp.h"
 
 int main(int argc, char **argv) {
-  // fd-uri
-  // apelez functia pt sockfd_udp
-  // apelez functia pr socket_tcp
-  // fd_read += sockfd_udp + sockfd_tcp +stdin
-  // select in while(1) => verific nr socket (daca e de udp sau tcp)
-  //    =>udp -> handle_message_udp
-  //    =>tcp -> handle_conections (accept + altele)
-  //    =>stdin -> handle_keyboard_input -> daca exit, break
-
   if (argc < 2) {
     fprintf(stderr, "usage: server port_number\n");
     return -1;
